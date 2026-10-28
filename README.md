@@ -101,8 +101,9 @@ tests/MyVideoPlayer.Core.Tests
 
 ## リリースの作り方
 
-`v` で始まるタグを push すると、GitHub Actions（`.github/workflows/release.yml`）が Windows 上でテスト・ビルドし、
-Release に `MyVideoPlayer-win-x64.zip` を添付します。リリースノートは `.github/release-notes.md` です。
+GitHub の **Actions** タブ → **build-and-release** → **Run workflow** でバージョン（例: `0.2.0`）を入れて実行すると、
+Windows 上でテスト・ビルドし、タグ `v0.2.0` と Release を作って `MyVideoPlayer-win-x64.zip` を添付します。
+リリースノートは `.github/release-notes.md` です。タグを push しても同じことができます。
 
 ```powershell
 git tag v0.2.0
