@@ -1,0 +1,51 @@
+# v で始まるタグ（例: v0.1.0）を push すると、Windows でビルド・テストして
+# GitHub Release に MyVideoPlayer-win-x64.zip を添付する。
+# main への push / PR ではビルドとテストだけ行う。
+name: build-and-release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Test
+        run: dotnet test tests/MyVideoPlayer.Core.Tests -c Release
+
+      - name: Publish (self-contained win-x64)
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME.TrimStart("v") } else { "0.0.0-dev" }
+          dotnet publish src/MyVideoPlayer.App -c Release -r win-x64 --self-contained true `
+            -p:DebugType=none -p:Version=$version -o dist/MyVideoPlayer
+          Copy-Item README.md dist/MyVideoPlayer/
+          Compress-Archive -Path dist/MyVideoPlayer/* -DestinationPath dist/MyVideoPlayer-win-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyVideoPlayer-win-x64
+          path: dist/MyVideoPlayer-win-x64.zip
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MyVideoPlayer ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          files: dist/MyVideoPlayer-win-x64.zip

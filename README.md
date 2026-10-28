@@ -98,3 +98,13 @@ tests/MyVideoPlayer.Core.Tests
 - チャプター: ffprobe が使えればそこから、使えない場合は再生開始後に VLC が認識したものを表示します。
 - タイムスタンプの抽出は「行の中に `m:ss` / `h:mm:ss` がある行」を拾います。動画の長さを超える時刻は無視します。
 - 映像の上に重ねている部分（メッセージ表示・クリック判定）は、VLC の映像ウィンドウの仕様上、別の透明ウィンドウとして描画しています。
+
+## リリースの作り方
+
+`v` で始まるタグを push すると、GitHub Actions（`.github/workflows/release.yml`）が Windows 上でテスト・ビルドし、
+Release に `MyVideoPlayer-win-x64.zip` を添付します。リリースノートは `.github/release-notes.md` です。
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
