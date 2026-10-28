@@ -122,7 +122,7 @@ public sealed class FfmpegIntegrationTests : IDisposable
         Assert.Equal(stamp, File.GetLastWriteTimeUtc(again!));
     }
 
-    private string MakeM4a(string name, bool withCover, string? metadataFile = null, params string[] extra)
+    private string MakeAudio(string name, bool withCover, string? metadataFile = null, params string[] extra)
     {
         var output = Path.Combine(_dir, name);
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y",
@@ -138,7 +138,12 @@ public sealed class FfmpegIntegrationTests : IDisposable
         args.AddRange(new[] { "-map", "0:a" });
         if (withCover) args.AddRange(new[] { "-map", "1:v", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic" });
         args.AddRange(extra);
-        args.AddRange(new[] { "-c:a", "aac", "-b:a", "64k", output });
+        args.AddRange(Path.GetExtension(name).ToLowerInvariant() switch
+        {
+            ".mp3" => new[] { "-c:a", "libmp3lame", "-b:a", "64k", "-id3v2_version", "3", output },
+            ".wav" => new[] { "-c:a", "pcm_s16le", output },
+            _ => new[] { "-c:a", "aac", "-b:a", "64k", output },
+        });
 
         var psi = new ProcessStartInfo(_tools.FfmpegPath!) { RedirectStandardError = true };
         foreach (var a in args) psi.ArgumentList.Add(a);
@@ -167,7 +172,7 @@ public sealed class FfmpegIntegrationTests : IDisposable
     public async Task M4aWithCoverChaptersAndDescription()
     {
         if (!_tools.IsAvailable) return;
-        var file = MakeM4a("ポッドキャスト.m4a", withCover: true, WriteChapterMetadata(),
+        var file = MakeAudio("ポッドキャスト.m4a", withCover: true, WriteChapterMetadata(),
             "-metadata", "description=0:00 はじめに\n0:15 本題");
         var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
         var info = await cache.GetInfoAsync(file);
@@ -192,13 +197,47 @@ public sealed class FfmpegIntegrationTests : IDisposable
     public async Task M4aWithoutCoverHasNoThumbnail()
     {
         if (!_tools.IsAvailable) return;
-        var file = MakeM4a("no cover.m4a", withCover: false);
+        var file = MakeAudio("no cover.m4a", withCover: false);
         var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
         var info = await cache.GetInfoAsync(file);
 
         Assert.NotNull(info);
         Assert.True(info!.IsAudioOnly);
         Assert.False(info.HasCoverArt);
+        Assert.Null(await cache.GetThumbnailAsync(file, info));
+    }
+
+    [Fact]
+    public async Task Mp3WithCoverAndCommentTimestamps()
+    {
+        if (!_tools.IsAvailable) return;
+        // ID3 のコメント欄にタイムスタンプを書くことが多い
+        var file = MakeAudio("歌.mp3", withCover: true, null, "-metadata", "comment=0:00 Aメロ\n0:20 サビ");
+        var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
+        var info = await cache.GetInfoAsync(file);
+
+        Assert.NotNull(info);
+        Assert.True(info!.IsAudioOnly);
+        Assert.True(info.HasCoverArt);
+        Assert.Equal("mp3", info.AudioCodec);
+        Assert.InRange(info.Duration!.Value.TotalSeconds, 29, 31);
+        Assert.Equal(new[] { "Aメロ", "サビ" }, info.DescriptionTimestamps.Select(t => t.Title));
+        Assert.NotNull(await cache.GetThumbnailAsync(file, info));
+    }
+
+    [Fact]
+    public async Task WavIsAudioWithoutCover()
+    {
+        if (!_tools.IsAvailable) return;
+        var file = MakeAudio("録音 01.wav", withCover: false);
+        var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
+        var info = await cache.GetInfoAsync(file);
+
+        Assert.NotNull(info);
+        Assert.True(info!.IsAudioOnly);
+        Assert.False(info.HasCoverArt);
+        Assert.Equal("pcm_s16le", info.AudioCodec);
+        Assert.InRange(info.Duration!.Value.TotalSeconds, 29, 31);
         Assert.Null(await cache.GetThumbnailAsync(file, info));
     }
 
@@ -220,10 +259,15 @@ public sealed class FfmpegIntegrationTests : IDisposable
         File.WriteAllText(Path.Combine(_dir, "sub", "b.mkv"), "x");
         File.WriteAllText(Path.Combine(_dir, "note.txt"), "x");
         File.WriteAllText(Path.Combine(_dir, "sub", "song.M4A"), "x");
+        File.WriteAllText(Path.Combine(_dir, "sub", "track.mp3"), "x");
+        File.WriteAllText(Path.Combine(_dir, "sub", "voice.WAV"), "x");
 
         Assert.Single(VideoScanner.Scan(_dir, recursive: false));
         var all = VideoScanner.Scan(_dir, recursive: true);
-        Assert.Equal(3, all.Count);
+        Assert.Equal(5, all.Count);
+        Assert.True(VideoScanner.IsAudioExtension("x.Mp3"));
+        Assert.True(VideoScanner.IsAudioExtension("x.wav"));
+        Assert.False(VideoScanner.IsAudioExtension("x.mp4"));
         Assert.Contains(all, v => v.Name == "song.M4A");
         Assert.Contains(all, v => v.Name == "b.mkv" && v.RelativeDirectory == "sub");
     }
