@@ -54,6 +54,9 @@ public sealed partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _hasPrevious;
     [ObservableProperty] private bool _hasNext;
     [ObservableProperty] private string? _errorText;
+    /// <summary>音声ファイル（映像の代わりにカバー画像か音符を表示する）</summary>
+    [ObservableProperty] private bool _isAudio;
+    [ObservableProperty] private string? _coverPath;
 
     /// <summary>シークバーをドラッグ中は、再生位置で上書きしない</summary>
     public bool IsSeeking { get; set; }
@@ -131,6 +134,8 @@ public sealed partial class PlayerViewModel : ObservableObject, IDisposable
             var info = item.Info ?? await App.Cache.GetInfoAsync(item.FullPath);
             item.Info ??= info;
             ApplyInfo(item, info);
+            IsAudio = item.IsAudio;
+            CoverPath = IsAudio ? item.ThumbnailPath ?? await App.Cache.GetThumbnailAsync(item.FullPath, info) : null;
 
             // 続きから再生
             if (startAt is null && App.Settings.ResumePlayback && App.Settings.GetResume(item.FullPath) is { } resume)
@@ -187,8 +192,10 @@ public sealed partial class PlayerViewModel : ObservableObject, IDisposable
         if (info is not null)
         {
             if (info.Duration is { } d) lines.Add($"長さ: {TimeFormat.Format(d)}");
+            if (info.IsAudioOnly) lines.Add($"種類: 音声{(info.HasCoverArt ? "（カバー画像あり）" : "")}");
             if (info.Width is { } w && info.Height is { } h) lines.Add($"解像度: {w} × {h}");
             if (info.VideoCodec is { } codec) lines.Add($"映像コーデック: {codec.ToUpperInvariant()}");
+            if (info.AudioCodec is { } acodec) lines.Add($"音声コーデック: {acodec.ToUpperInvariant()}");
             if (!string.IsNullOrWhiteSpace(info.Title)) lines.Add($"タイトル: {info.Title}");
             if (info.CreationTime is { } ct) lines.Add($"作成日時: {ct.ToLocalTime():yyyy/MM/dd HH:mm}");
             lines.Add($"チャプター: {info.Chapters.Count} 件");

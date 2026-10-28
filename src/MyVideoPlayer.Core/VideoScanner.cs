@@ -9,7 +9,12 @@ public static class VideoScanner
     {
         ".mp4", ".m4v", ".mkv", ".webm", ".mov", ".avi", ".wmv", ".flv",
         ".ts", ".m2ts", ".mts", ".mpg", ".mpeg", ".3gp", ".ogv", ".vob", ".divx",
+        // 音声
+        ".m4a",
     };
+
+    public static bool IsAudioExtension(string path) =>
+        Path.GetExtension(path).Equals(".m4a", StringComparison.OrdinalIgnoreCase);
 
     public static IReadOnlyList<VideoFile> Scan(string root, bool recursive, IReadOnlySet<string>? extensions = null,
         CancellationToken ct = default)

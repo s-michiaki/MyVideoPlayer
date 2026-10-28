@@ -23,7 +23,7 @@ public sealed partial class VideoItemViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DurationText), nameof(ChapterCount), nameof(TimestampCount),
-        nameof(ResolutionText), nameof(ToolTipText))]
+        nameof(ResolutionText), nameof(ToolTipText), nameof(IsAudio))]
     private MediaInfo? _info;
 
     [ObservableProperty]
@@ -36,11 +36,14 @@ public sealed partial class VideoItemViewModel : ObservableObject
     [ObservableProperty]
     private double _resumeRatio;
 
+    /// <summary>m4a などの音声ファイル（一覧では音符アイコン／カバー画像で表示）</summary>
+    public bool IsAudio => Info?.IsAudioOnly ?? VideoScanner.IsAudioExtension(File.FullPath);
+
     public string? DurationText => Info?.Duration is { } d ? TimeFormat.Format(d) : null;
     public int ChapterCount => Info?.Chapters.Count ?? 0;
     public int TimestampCount => Info?.DescriptionTimestamps.Count ?? 0;
 
-    public string? ResolutionText => Info is { Height: { } h }
+    public string? ResolutionText => IsAudio ? "音声" : Info is { Height: { } h }
         ? h switch { >= 2100 => "4K", >= 1400 => "1440p", >= 1000 => "1080p", >= 700 => "720p", _ => $"{h}p" }
         : null;
 
@@ -53,7 +56,8 @@ public sealed partial class VideoItemViewModel : ObservableObject
             lines.Add($"{SizeText}  ·  {DateText}");
             if (Info is not null)
             {
-                if (Info.Width is { } w && Info.Height is { } h) lines.Add($"{w}×{h}  {Info.VideoCodec?.ToUpperInvariant()}");
+                if (Info.IsAudioOnly) lines.Add($"音声  {Info.AudioCodec?.ToUpperInvariant()}");
+                else if (Info.Width is { } w && Info.Height is { } h) lines.Add($"{w}×{h}  {Info.VideoCodec?.ToUpperInvariant()}");
                 if (ChapterCount > 0) lines.Add($"チャプター {ChapterCount} 件");
                 if (TimestampCount > 0) lines.Add($"説明文のタイムスタンプ {TimestampCount} 件");
             }

@@ -178,10 +178,37 @@
                                 Height="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=ListBox},
                                          Converter={StaticResource Multiply}, ConverterParameter=0.5625}">
                             <Grid>
-                                <TextBlock Text="&#xE714;" FontFamily="{StaticResource IconFont}" FontSize="30"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#3A3F4A" />
+                                <!-- サムネイルがまだ無いとき（音声ファイルは音符） -->
+                                <TextBlock FontFamily="{StaticResource IconFont}" FontSize="30"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="&#xE714;" />
+                                            <Setter Property="Foreground" Value="#3A3F4A" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsAudio}" Value="True">
+                                                    <Setter Property="Text" Value="&#xE8D6;" />
+                                                    <Setter Property="FontSize" Value="40" />
+                                                    <Setter Property="Foreground" Value="#5A4A40" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                                 <Image Source="{Binding ThumbnailPath, Converter={StaticResource ThumbPath}}"
-                                       Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                       RenderOptions.BitmapScalingMode="HighQuality">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Stretch" Value="UniformToFill" />
+                                            <Style.Triggers>
+                                                <!-- 正方形のカバー画像は切り取らずに全体を見せる -->
+                                                <DataTrigger Binding="{Binding IsAudio}" Value="True">
+                                                    <Setter Property="Stretch" Value="Uniform" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
 
                                 <!-- 左上: チャプター数・タイムスタンプ数 -->
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">

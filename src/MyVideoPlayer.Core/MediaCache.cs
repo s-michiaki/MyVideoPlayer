@@ -67,13 +67,23 @@ public sealed class MediaCache
     }
 
     /// <summary>サムネイル JPEG のパスを返す（なければ ffmpeg で作る）。作れなければ null。</summary>
-    public async Task<string?> GetThumbnailAsync(string path, TimeSpan? duration, CancellationToken ct = default)
+    public Task<string?> GetThumbnailAsync(string path, TimeSpan? duration, CancellationToken ct = default) =>
+        GetThumbnailAsync(path, new MediaInfo { Duration = duration }, ct);
+
+    /// <summary>
+    /// サムネイル JPEG のパスを返す（なければ ffmpeg で作る）。作れなければ null。
+    /// 音声ファイルはカバー画像があればそれを使い、なければ作らない（一覧では音符アイコンになる）。
+    /// </summary>
+    public async Task<string?> GetThumbnailAsync(string path, MediaInfo? info, CancellationToken ct = default)
     {
         var fi = new FileInfo(path);
         if (!fi.Exists) return null;
         var thumbPath = Path.Combine(CacheDirectory, KeyFor(fi) + ".jpg");
         if (File.Exists(thumbPath) && new FileInfo(thumbPath).Length > 0) return thumbPath;
         if (_tools.FfmpegPath is null) return null;
+        if (info is { IsAudioOnly: true, HasCoverArt: false }) return null;
+        var duration = info?.Duration;
+        bool cover = info is { IsAudioOnly: true, HasCoverArt: true };
 
         await _ffmpegSlots.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -83,10 +93,13 @@ public sealed class MediaCache
                 ? TimeSpan.FromSeconds(Math.Min(d.TotalSeconds * 0.1, 60))
                 : TimeSpan.FromSeconds(3);
 
-            foreach (var at in new[] { seek, TimeSpan.Zero })
+            // カバー画像は時刻に関係ない1枚なので、シークせずに取り出す
+            var attempts = cover ? new TimeSpan?[] { null } : new TimeSpan?[] { seek, TimeSpan.Zero };
+            foreach (var at in attempts)
             {
                 var tmp = thumbPath + ".tmp.jpg";
-                var (code, _, _) = await FfmpegTools.RunAsync(_tools.FfmpegPath, ThumbnailArguments(path, at, tmp),
+                var args = at is { } t ? ThumbnailArguments(path, t, tmp) : CoverArtArguments(path, tmp);
+                var (code, _, _) = await FfmpegTools.RunAsync(_tools.FfmpegPath, args,
                     ct, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
                 if (code == 0 && File.Exists(tmp) && new FileInfo(tmp).Length > 0)
                 {
@@ -115,6 +128,18 @@ public sealed class MediaCache
         "-frames:v", "1",
         "-vf", "scale=480:-2",
         "-q:v", "4",
+        "-f", "image2",
+        output,
+    };
+
+    public static IReadOnlyList<string> CoverArtArguments(string input, string output) => new[]
+    {
+        "-hide_banner", "-loglevel", "error", "-y",
+        "-i", input,
+        "-map", "0:v:0", "-an",
+        "-frames:v", "1",
+        "-vf", "scale='min(600,iw)':-2",
+        "-q:v", "3",
         "-f", "image2",
         output,
     };

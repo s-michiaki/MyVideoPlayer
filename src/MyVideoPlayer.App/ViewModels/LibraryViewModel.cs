@@ -223,7 +223,7 @@ public sealed partial class LibraryViewModel : ObservableObject
                 async (item, token) =>
                 {
                     var info = await App.Cache.GetInfoAsync(item.FullPath, token);
-                    var thumb = await App.Cache.GetThumbnailAsync(item.FullPath, info?.Duration, token);
+                    var thumb = await App.Cache.GetThumbnailAsync(item.FullPath, info, token);
                     await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
                         item.Info = info;

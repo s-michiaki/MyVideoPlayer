@@ -99,6 +99,16 @@
                 <Grid x:Name="Overlay" Background="#01000000"
                       MouseLeftButtonDown="OnOverlayMouseDown" MouseWheel="OnOverlayWheel" MouseMove="OnOverlayMouseMove">
 
+                    <!-- 音声ファイル: 映像の代わりにカバー画像（なければ音符） -->
+                    <Grid IsHitTestVisible="False" Visibility="{Binding IsAudio, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="&#xE8D6;" FontFamily="{StaticResource IconFont}" FontSize="96"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#40FF7A45"
+                                   Visibility="{Binding CoverPath, Converter={StaticResource NullToCollapsed}, ConverterParameter=invert}" />
+                        <Image Source="{Binding CoverPath, Converter={StaticResource ThumbPath}, ConverterParameter=800}"
+                               Stretch="Uniform" Margin="40" MaxWidth="600" MaxHeight="600"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Grid>
+
                     <!-- 一瞬だけ出すメッセージ -->
                     <Border x:Name="OsdBorder" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="18"
                             Background="#C0101216" CornerRadius="8" Padding="14,8" Opacity="0" IsHitTestVisible="False">

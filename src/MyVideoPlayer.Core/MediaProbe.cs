@@ -15,7 +15,6 @@ public static class MediaProbe
         "-v", "error",
         "-print_format", "json",
         "-show_format", "-show_chapters", "-show_streams",
-        "-select_streams", "v:0",
         file,
     };
 
@@ -44,12 +43,26 @@ public static class MediaProbe
         }
 
         int? width = null, height = null;
-        string? codec = null;
+        string? codec = null, audioCodec = null;
+        bool hasVideo = false, hasCover = false;
         if (root.TryGetProperty("streams", out var streams) && streams.ValueKind == JsonValueKind.Array)
         {
             foreach (var s in streams.EnumerateArray())
             {
-                if (s.TryGetProperty("codec_type", out var ct) && ct.GetString() != "video") continue;
+                var type = s.TryGetProperty("codec_type", out var ct) ? ct.GetString() : null;
+                if (type == "audio")
+                {
+                    if (audioCodec is null && s.TryGetProperty("codec_name", out var acn)) audioCodec = acn.GetString();
+                    duration ??= ReadSeconds(s, "duration");
+                    continue;
+                }
+                if (type != "video") continue;
+
+                // m4a などのカバー画像は「映像ストリーム」として見えるので区別する
+                if (IsAttachedPicture(s)) { hasCover = true; continue; }
+                if (hasVideo) continue;
+                hasVideo = true;
+
                 if (s.TryGetProperty("width", out var w) && w.TryGetInt32(out var wi)) width = wi;
                 if (s.TryGetProperty("height", out var h) && h.TryGetInt32(out var hi)) height = hi;
                 if (s.TryGetProperty("codec_name", out var cn)) codec = cn.GetString();
@@ -61,7 +74,6 @@ public static class MediaProbe
                     CollectTags(st, streamTags);
                     foreach (var kv in streamTags) tags.TryAdd(kv.Key, kv.Value);
                 }
-                break;
             }
         }
 
@@ -82,6 +94,9 @@ public static class MediaProbe
             Width = width,
             Height = height,
             VideoCodec = codec,
+            AudioCodec = audioCodec,
+            IsAudioOnly = !hasVideo && audioCodec is not null,
+            HasCoverArt = hasCover,
             Description = description,
             Chapters = chapters,
             DescriptionTimestamps = descTimestamps,
@@ -131,6 +146,11 @@ public static class MediaProbe
             .ThenByDescending(c => c.Length)
             .First();
     }
+
+    private static bool IsAttachedPicture(JsonElement stream) =>
+        stream.TryGetProperty("disposition", out var d)
+        && d.TryGetProperty("attached_pic", out var ap)
+        && ap.ValueKind == JsonValueKind.Number && ap.GetInt32() == 1;
 
     private static void CollectTags(JsonElement tagsElement, Dictionary<string, string> into)
     {

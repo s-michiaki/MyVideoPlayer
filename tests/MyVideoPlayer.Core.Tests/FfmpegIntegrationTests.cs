@@ -122,6 +122,96 @@ public sealed class FfmpegIntegrationTests : IDisposable
         Assert.Equal(stamp, File.GetLastWriteTimeUtc(again!));
     }
 
+    private string MakeM4a(string name, bool withCover, string? metadataFile = null, params string[] extra)
+    {
+        var output = Path.Combine(_dir, name);
+        var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=30" };
+        int next = 1;
+        if (withCover)
+        {
+            args.AddRange(new[] { "-i", MakeCoverPng() });
+            next++;
+        }
+        if (metadataFile is not null)
+            args.AddRange(new[] { "-i", metadataFile, "-map_metadata", next.ToString(), "-map_chapters", next.ToString() });
+        args.AddRange(new[] { "-map", "0:a" });
+        if (withCover) args.AddRange(new[] { "-map", "1:v", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic" });
+        args.AddRange(extra);
+        args.AddRange(new[] { "-c:a", "aac", "-b:a", "64k", output });
+
+        var psi = new ProcessStartInfo(_tools.FfmpegPath!) { RedirectStandardError = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi)!;
+        var err = p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        Assert.True(p.ExitCode == 0, err);
+        return output;
+    }
+
+    private string MakeCoverPng()
+    {
+        var png = Path.Combine(_dir, "cover.png");
+        if (File.Exists(png)) return png;
+        var psi = new ProcessStartInfo(_tools.FfmpegPath!) { RedirectStandardError = true };
+        foreach (var a in new[] { "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                     "-i", "color=c=orange:s=300x300", "-frames:v", "1", png })
+            psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi)!;
+        p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        return png;
+    }
+
+    [Fact]
+    public async Task M4aWithCoverChaptersAndDescription()
+    {
+        if (!_tools.IsAvailable) return;
+        var file = MakeM4a("ポッドキャスト.m4a", withCover: true, WriteChapterMetadata(),
+            "-metadata", "description=0:00 はじめに\n0:15 本題");
+        var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
+        var info = await cache.GetInfoAsync(file);
+
+        Assert.NotNull(info);
+        Assert.True(info!.IsAudioOnly);
+        Assert.True(info.HasCoverArt);
+        Assert.Null(info.Width);                 // カバー画像の大きさを解像度として扱わない
+        Assert.Equal("aac", info.AudioCodec);
+        Assert.InRange(info.Duration!.Value.TotalSeconds, 29, 31);
+        Assert.Equal(new[] { "オープニング", "本編", "エンディング" }, info.Chapters.Select(c => c.Title));
+        Assert.Equal(new[] { "はじめに", "本題" }, info.DescriptionTimestamps.Select(t => t.Title));
+
+        var thumb = await cache.GetThumbnailAsync(file, info);
+        Assert.NotNull(thumb);
+        var bytes = await File.ReadAllBytesAsync(thumb!);
+        Assert.Equal(0xFF, bytes[0]);
+        Assert.Equal(0xD8, bytes[1]);
+    }
+
+    [Fact]
+    public async Task M4aWithoutCoverHasNoThumbnail()
+    {
+        if (!_tools.IsAvailable) return;
+        var file = MakeM4a("no cover.m4a", withCover: false);
+        var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
+        var info = await cache.GetInfoAsync(file);
+
+        Assert.NotNull(info);
+        Assert.True(info!.IsAudioOnly);
+        Assert.False(info.HasCoverArt);
+        Assert.Null(await cache.GetThumbnailAsync(file, info));
+    }
+
+    [Fact]
+    public async Task VideoIsNotTreatedAsAudio()
+    {
+        if (!_tools.IsAvailable) return;
+        var file = MakeVideo("video+audio.mp4", null);
+        var info = await new MediaCache(_tools, Path.Combine(_dir, "cache")).GetInfoAsync(file);
+        Assert.False(info!.IsAudioOnly);
+        Assert.False(info.HasCoverArt);
+    }
+
     [Fact]
     public void ScannerFindsVideosRecursively()
     {
@@ -129,10 +219,12 @@ public sealed class FfmpegIntegrationTests : IDisposable
         File.WriteAllText(Path.Combine(_dir, "a.MP4"), "x");
         File.WriteAllText(Path.Combine(_dir, "sub", "b.mkv"), "x");
         File.WriteAllText(Path.Combine(_dir, "note.txt"), "x");
+        File.WriteAllText(Path.Combine(_dir, "sub", "song.M4A"), "x");
 
         Assert.Single(VideoScanner.Scan(_dir, recursive: false));
         var all = VideoScanner.Scan(_dir, recursive: true);
-        Assert.Equal(2, all.Count);
+        Assert.Equal(3, all.Count);
+        Assert.Contains(all, v => v.Name == "song.M4A");
         Assert.Contains(all, v => v.Name == "b.mkv" && v.RelativeDirectory == "sub");
     }
 
@@ -144,7 +236,7 @@ public sealed class FfmpegIntegrationTests : IDisposable
         File.WriteAllText(bad, "not a video");
         var cache = new MediaCache(_tools, Path.Combine(_dir, "cache"));
         Assert.Null(await cache.GetInfoAsync(bad));
-        Assert.Null(await cache.GetThumbnailAsync(bad, null));
+        Assert.Null(await cache.GetThumbnailAsync(bad, (MediaInfo?)null));
     }
 
     [Fact]

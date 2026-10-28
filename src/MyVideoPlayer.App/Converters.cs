@@ -68,7 +68,7 @@ public sealed class ThumbnailPathConverter : IValueConverter
             bmp.BeginInit();
             bmp.CacheOption = BitmapCacheOption.OnLoad;          // 読み込み後にファイルを閉じる
             bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-            bmp.DecodePixelWidth = 400;
+            bmp.DecodePixelWidth = parameter is not null && int.TryParse(parameter.ToString(), out var w) ? w : 400;
             bmp.UriSource = new Uri(path);
             bmp.EndInit();
             bmp.Freeze();

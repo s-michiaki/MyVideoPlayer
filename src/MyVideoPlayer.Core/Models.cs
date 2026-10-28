@@ -24,6 +24,13 @@ public sealed class MediaInfo
     public int? Width { get; init; }
     public int? Height { get; init; }
     public string? VideoCodec { get; init; }
+    public string? AudioCodec { get; init; }
+
+    /// <summary>映像がない音声ファイル（m4a など）。カバー画像は映像に数えない。</summary>
+    public bool IsAudioOnly { get; init; }
+
+    /// <summary>音声ファイルにカバー画像（アートワーク）が埋め込まれている</summary>
+    public bool HasCoverArt { get; init; }
 
     /// <summary>説明文（description / synopsis / comment タグのうち最も情報量の多いもの）</summary>
     public string? Description { get; init; }
