@@ -48,6 +48,18 @@ jobs:
           Copy-Item README.md dist/MyVideoPlayer/
           Compress-Archive -Path dist/MyVideoPlayer/* -DestinationPath dist/MyVideoPlayer-win-x64.zip
 
+      # 発行した exe を実際に起動し、libvlc の読み込み・解析・再生開始まで動くか確認する
+      - name: Smoke test (published exe)
+        shell: pwsh
+        run: |
+          Write-Host "== 配布物の中身（トップ）"
+          Get-ChildItem dist/MyVideoPlayer | Format-Table Name, Length -AutoSize | Out-String | Write-Host
+          $result = Join-Path $env:RUNNER_TEMP "selftest.txt"
+          $p = Start-Process -FilePath dist/MyVideoPlayer/MyVideoPlayer.exe -ArgumentList "--selftest", "`"$result`"" -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "selftest がタイムアウトしました" }
+          if (Test-Path $result) { Get-Content $result | Write-Host } else { Write-Host "結果ファイルがありません" }
+          if ($p.ExitCode -ne 0) { throw "selftest に失敗しました (exit $($p.ExitCode))" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: MyVideoPlayer-win-x64
