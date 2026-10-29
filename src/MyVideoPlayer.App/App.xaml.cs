@@ -17,7 +17,10 @@ public partial class App : Application
     // LibVLC の初期化（プラグイン読み込み）は 0.5 秒ほどかかるので、最初に再生するときまで遅らせる
     private static readonly Lazy<LibVLC> _libVlc = new(() =>
     {
-        LibVLCSharp.Shared.Core.Initialize();
+        // 単一ファイル発行では DLL の場所から libvlc を探せないので、exe の隣の libvlc\win-x64 を明示する
+        var libvlcDir = Path.Combine(AppContext.BaseDirectory, "libvlc", "win-x64");
+        if (Directory.Exists(libvlcDir)) LibVLCSharp.Shared.Core.Initialize(libvlcDir);
+        else LibVLCSharp.Shared.Core.Initialize();
         return new LibVLC(
             "--no-video-title-show",   // 再生開始時にファイル名を映像に重ねない
             "--no-snapshot-preview",

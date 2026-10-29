@@ -54,6 +54,13 @@
 `MyVideoPlayer-win-x64.zip` を好きな場所に展開して `MyVideoPlayer.exe` を実行します。
 .NET ランタイムと VLC は同梱済みなので、追加のインストールは不要です。
 
+```
+MyVideoPlayer\
+├─ MyVideoPlayer.exe   … アプリ本体（.NET ランタイムと必要な DLL をすべて内包）
+├─ libvlc\             … 再生エンジン（VLC）。exe と同じ場所に置いたままにしてください
+└─ README.md
+```
+
 ### ffmpeg を用意する（サムネイルとタイムスタンプに必要）
 次のどれかで ffmpeg / ffprobe を置いてください。無くても再生とチャプター表示はできます。
 

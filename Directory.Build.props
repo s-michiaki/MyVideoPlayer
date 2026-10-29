@@ -1,0 +1,7 @@
+<Project>
+  <!-- Release ビルドではデバッグ用の .pdb を出力しない（配布物をすっきりさせる） -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+</Project>

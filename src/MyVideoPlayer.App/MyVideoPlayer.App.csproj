@@ -22,6 +22,19 @@
     <SelfContained>false</SelfContained>
   </PropertyGroup>
 
+  <!--
+    発行時は exe 1つにまとめる（.NET ランタイム・DLL・json をすべて exe に内包）。
+    VLC のプラグインは実行時にファイルとして必要なので libvlc\ フォルダだけは exe の隣に残る。
+  -->
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <SatelliteResourceLanguages>ja;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="LibVLCSharp.WPF" Version="3.10.2" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
@@ -36,6 +49,11 @@
     <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
   </PropertyGroup>
 
+  <!-- 再生に不要な VLC のファイル（開発用の .lib、ブラウザから操作する Web UI）は同梱しない -->
+  <ItemGroup>
+    <VlcWindowsX64ExcludeFiles Include="libvlc.lib;libvlccore.lib;lua\http\%2A%2A;lua\intf\%2A%2A" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MyVideoPlayer.Core\MyVideoPlayer.Core.csproj" />
   </ItemGroup>
@@ -43,5 +61,14 @@
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
+
+  <!-- VLC 本体とプラグインは exe に入れず、libvlc\ フォルダにファイルとして置く（VLC がフォルダから読み込むため） -->
+  <Target Name="KeepLibVlcOutsideSingleFile" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Condition="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('/', '\').StartsWith('libvlc\'))">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>
